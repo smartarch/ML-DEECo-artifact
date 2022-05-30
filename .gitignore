@@ -1,0 +1,15 @@
+# GIT ignore configruation
+
+# The environment folders are ignored
+env/
+.vscode/
+*.cmd
+
+# The simulation results are ignored
+*/results/*
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+.mypy_cache
