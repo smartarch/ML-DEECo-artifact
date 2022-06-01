@@ -236,7 +236,7 @@ def collectStatistics(train, iteration):
 def main():
     parser = argparse.ArgumentParser(description='Process YAML source file (S) and run the simulation (N) Times with Model M.')
     parser.add_argument('input', type=str, help='YAML address to be run.')
-
+    # TODO create YAML file to declare estimators to estimates and deal with the following arguments
     parser.add_argument('-i', '--iterations', type=int, help='The number of iterations (trainings) to be performed.', required=False, default="1")
     parser.add_argument('-s', '--simulations', type=int, help='The number of simulation runs per iteration.', required=False, default="1")
 
