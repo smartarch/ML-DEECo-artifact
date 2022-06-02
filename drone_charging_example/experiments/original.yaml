@@ -1,0 +1,29 @@
+# simulation arguments
+
+# The number of iterations (trainings) to be performed.
+iterations: 2
+
+# The number of simulation runs per iteration.
+simulations: 3
+
+# output folder
+output: 'object-based-remote-test-12drones'
+
+# verbose level
+verbose: 2
+
+# chart
+chart: True
+
+# render animation
+animation: True
+
+# False = use only training data from last iteration.
+# True = accumulate training data from all previous iterations.
+# <number> = accumulate training data from last <number> iterations.
+accumulate_data: False
+
+# random seeder
+seeds: 42
+# number of threads
+threads: 4
