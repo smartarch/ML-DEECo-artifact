@@ -25,9 +25,12 @@ from utils import plots
 from utils.average_log import AverageLog
 
 from ml_deeco.estimators import ConstantEstimator, NeuralNetworkEstimator
-from ml_deeco.simulation import run_experiment, SIMULATION_GLOBALS
+from ml_deeco.simulation import Simulation, SIMULATION_GLOBALS
 from ml_deeco.utils import setVerboseLevel, verbosePrint, Log
 
+
+# instead of os, to work on every platform
+from pathlib import Path
 
 def run(args):
     """
@@ -106,8 +109,15 @@ def run(args):
         for estimator in SIMULATION_GLOBALS.estimators:
             estimator.saveModel(t + 1)
 
-    run_experiment(args.iterations, args.simulations, ENVIRONMENT.maxSteps, prepareSimulation,
-                   iterationCallback=iterationCallback, simulationCallback=simulationCallback, stepCallback=stepCallback)
+    simulation = Simulation(
+        args.iterations,
+        args.simulations,
+        prepareSimulation,
+        iterationCallback=iterationCallback,
+        simulationCallback=simulationCallback,
+        stepCallback=stepCallback )
+        
+    simulation.run_experiment(ENVIRONMENT.maxSteps)
 
     totalLog.export(f"{folder}\\{yamlFileName}.csv")
     averageLog.export(f"{folder}\\{yamlFileName}_average.csv")
@@ -127,10 +137,6 @@ def loadConfig(args):
     yamlFile = open(args.input, 'r')
     yamlObject = load(yamlFile, Loader=Loader)
 
-    # yamlObject['drones']=drones
-    if args.birds > -1:
-        yamlObject['birds'] = args.birds
-    # yamlObject['maxSteps']=int(args.timesteps)
     yamlObject['chargerCapacity'] = findChargerCapacity(yamlObject)
     yamlObject['totalAvailableChargingEnergy'] = min(
         yamlObject['chargerCapacity'] * len(yamlObject['chargers']) * yamlObject['chargingRate'],
@@ -193,10 +199,10 @@ def createEstimators(args, folder):
     commonArgs = {
         "accumulateData": args.accumulate_data,
         "saveCharts": args.chart,
-        "testSplit": args.test_split,
+        "testSplit": 0.2,
     }
     WORLD.waitingTimeEstimator = NeuralNetworkEstimator(
-        args.hidden_layers,
+        [255, 255], # hidden layers
         fit_params={
             "batch_size": 256,
         },
@@ -204,11 +210,11 @@ def createEstimators(args, folder):
         name="Waiting Time",
         **commonArgs,
     )
-    WORLD.waitingTimeBaseline = args.baseline
+    WORLD.waitingTimeBaseline = 0
     # if args.load != "":
     #     waitingTimeEstimator.loadModel(args.load)
     WORLD.batteryEstimator = NeuralNetworkEstimator(
-        args.hidden_layers,
+        [255, 255], # hidden layers
         fit_params={
             "batch_size": 256,
         },
@@ -232,40 +238,155 @@ def collectStatistics(train, iteration):
         iteration + 1,
     ]
 
+class TestClass:
+    def __init__ (self, a, b):
+        self.A = a
+        self.B = b
+    
+
+
+def validateArguments(args):
+
+    if args.config:
+        configPath = Path(args.config)
+        if not configPath.exists():
+            raise IOError(f"such file {args.config} does not exist")
+        simulationConfigFile = open(configPath, 'r')
+        simulationConfigObject = load(simulationConfigFile, Loader=Loader)
+        
+    else:
+        simulationConfigObject = {}
+
+    # override
+    for argument in args.__dict__ :
+        if args.__dict__[argument] is not None:
+            simulationConfigObject[argument] = args.__dict__[argument]
+    
+    # set default values
+    for argument , default in zip(
+        ['output', 'verbose', 'chart', 'animation', 'seeds', 'thread'],
+        ['output', 0        , False  , False      , 42     , 4]
+    ):
+        if argument not in simulationConfigObject:
+            simulationConfigObject[argument] = default
+
+    def validateArgument(argument, condition, message):
+        if argument not in simulationConfigObject \
+           or not condition(simulationConfigObject[argument]):
+            raise argparse.ArgumentTypeError(message)
+        return True
+
+
+    notZeroCondition = lambda x: x >= 0
+    notNoneCondition = lambda x: x is not None
+    noneCondition = lambda x: x is None
+    intTypeCondition = lambda x: isinstance(x, int)
+    boolTypeCondition = lambda x: isinstance(x, bool)
+    stringTypeCondition = lambda x: isinstance(x, str)
+    andCondition = lambda a,b: lambda x: a(x) and b(x)
+    orCondition = lambda a,b: lambda x: a(x) or b(x)
+
+    # required arguments
+    finalCheckup = [ 
+        validateArgument(
+            x, 
+            notNoneCondition, 
+            f"{x} must be provided in the configuration file or arguments")
+        for x in ['iterations', 'simulations', 'output', 'input']
+    ]
+    # positive integers
+    finalCheckup.extend([
+        validateArgument(
+            x, 
+            orCondition(
+                noneCondition, 
+                andCondition(notZeroCondition,intTypeCondition)
+            ), 
+            f"{x} must be a positive integer number > 0.")
+        for x in ['iterations', 'simulations', 'seeds','threads']
+    ])
+    # strings
+    finalCheckup.extend([
+        validateArgument(
+            x, 
+            stringTypeCondition,
+            f"{x} must be a string")
+        for x in ['input', 'output']
+    ])
+
+    # special attribute
+    finalCheckup.append(
+        validateArgument(
+            'accumulate_data', 
+            orCondition(
+                boolTypeCondition, 
+                andCondition(notZeroCondition,intTypeCondition)
+            ),
+            'accumulate_data must be True, False or positive integer'
+            )
+    )
+
+    if not all(finalCheckup):
+        raise argparse.ArgumentTypeError('an error ocurred.')
+
+    return simulationConfigObject
 
 def main():
-    parser = argparse.ArgumentParser(description='Process YAML source file (S) and run the simulation (N) Times with Model M.')
-    parser.add_argument('input', type=str, help='YAML address to be run.')
-    # TODO create YAML file to declare estimators to estimates and deal with the following arguments
-    parser.add_argument('-i', '--iterations', type=int, help='The number of iterations (trainings) to be performed.', required=False, default="1")
-    parser.add_argument('-s', '--simulations', type=int, help='The number of simulation runs per iteration.', required=False, default="1")
+    parser = argparse.ArgumentParser(
+        # TODO add proper description
+        description='')
+    parser.add_argument(
+        'input', type=str, 
+        help='YAML world address to be run.',
+    )
+    parser.add_argument(
+        '-c', '--config', type=str, 
+        help='the configuration file', 
+        required=False, default=None
+    )
+    parser.add_argument(
+        '-i', '--iterations', type=int, 
+        help='The number of iterations (trainings) to be performed.', 
+        required=False,  default=None
+    )
+    parser.add_argument(
+        '-s', '--simulations', type=int, 
+        help='The number of simulation runs per iteration.', 
+        required=False, default=None
+    )
+    parser.add_argument(
+        '-o', '--output', type=str, 
+        help='the output folder', 
+        required=False, default=None
+    )
+    parser.add_argument(
+        '-v', '--verbose', type=int, 
+        help='the verboseness between 0 and 4.', 
+        required=False, default=None
+    )
+    parser.add_argument(
+        '-a', '--animation', action='store_true', 
+        help='toggles saving the final results as a GIF animation.',
+        required=False,  default=None
+    )
+    parser.add_argument(
+       '--seed', type=int, 
+       help='Random seed.', 
+       required=False, default=None)
 
-    parser.add_argument('-o', '--output', type=str, help='the output folder', required=False, default="output")
-    parser.add_argument('-v', '--verbose', type=int, help='the verboseness between 0 and 4.', required=False, default="0")
-    parser.add_argument('-a', '--animation', action='store_true', default=False,
-                        help='toggles saving the final results as a GIF animation.')
-    parser.add_argument('-c', '--chart', action='store_true', default=False, help='toggles saving and showing the charts.')
+    parser.add_argument(
+        '--threads', type=int, 
+        help='Number of CPU threads TF can use.', 
+        required=False, default=None)
 
-    parser.add_argument('-d', '--accumulate_data', action='store', default=False, const=True, nargs="?", type=int,
-                        help='False = use only training data from last iteration.\nTrue = accumulate training data from all previous iterations.\n<number> = accumulate training data from last <number> iterations.')
-    parser.add_argument('--test_split', type=float, help='Number of records used for evaluation.', required=False, default=0.2)
-    parser.add_argument('--hidden_layers', nargs="+", type=int, default=[256, 256], help='Number of neurons in hidden layers.')
-    parser.add_argument('-b', '--baseline', type=int, help='Constant for waiting time baseline.', required=False, default=0)
-
-    parser.add_argument('--seed', type=int, help='Random seed.', required=False, default=42)
-    parser.add_argument('--threads', type=int, help='Number of CPU threads TF can use.', required=False, default=4)
-    # parser.add_argument('-l', '--load', type=str, help='Load the model from a file.', required=False, default="")  # TODO: split for waiting time and battery
-
-    parser.add_argument('-x', '--birds', type=int, help='number of birds, if no set, it loads from yaml file.', required=False, default=-1)
     args = parser.parse_args()
+    config = validateArguments(args)
+
+    # TODO optional, to use only one dictionary we combine both into args
+    for argument in config:
+        args.__dict__[argument] = config[argument]
 
     setVerboseLevel(args.verbose)
-
-    if args.iterations <= 0:
-        raise argparse.ArgumentTypeError(f"Number of iterations must be positive: {args.iterations}")
-    if args.simulations <= 0:
-        raise argparse.ArgumentTypeError(f"Number of simulations must be positive: {args.simulations}")
-
     run(args)
 
 
