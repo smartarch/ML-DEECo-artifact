@@ -6,24 +6,28 @@ iterations: 2
 # The number of simulation runs per iteration.
 simulations: 3
 
-# output folder
-output: 'object-based-remote-test-12drones'
 
-# verbose level
-verbose: 2
-
-# chart
-chart: True
-
-# render animation
-animation: True
-
-# False = use only training data from last iteration.
-# True = accumulate training data from all previous iterations.
-# <number> = accumulate training data from last <number> iterations.
-accumulate_data: False
-
-# random seeder
-seeds: 42
-# number of threads
-threads: 4
+estimators:
+  waitingTimeEstimator: 
+    class: ml_deeco.estimators.NeuralNetworkEstimator
+    args:
+      hidden_layers: [255, 255]
+      name: "Waiting Time"
+      fit_params: 
+        batch_size: 256
+      outputFolder: 'waiting_time'
+      testSplit: 0.2
+      accumulateData: False
+      saveCharts: False
+      
+  batteryEstimator: 
+    class: ml_deeco.estimators.NeuralNetworkEstimator
+    args:
+      hidden_layers: [64]
+      name: "Battery"
+      fit_params: 
+        batch_size: 128
+      outputFolder: 'battery'
+      testSplit: 0.2
+      accumulateData: True
+      saveCharts: False
