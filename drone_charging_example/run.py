@@ -2,12 +2,6 @@
 This file contains a simple experiment run
 """
 from typing import Optional
-
-from yaml import load
-try:
-    from yaml import CLoader as Loader, CDumper as Dumper
-except ImportError:
-    from yaml import Loader, Dumper
 import os
 import argparse
 import random
@@ -31,7 +25,15 @@ from ml_deeco.utils import setVerboseLevel, verbosePrint, Log
 
 # instead of os, to work on every platform
 from pathlib import Path
+import yaml
 
+def readYaml (file):
+    with open(file, "r") as stream:
+        try:
+            return yaml.load(stream, Loader=yaml.CLoader)
+        except yaml.YAMLError as e:
+                raise e
+                
 def run(args):
     """
     Runs `args.iterations` times _iteration_ of [`args.simulations` times _simulation_ + 1 training].
@@ -49,12 +51,10 @@ def run(args):
     yamlObject = loadConfig(args)
 
     folder, yamlFileName = prepareFoldersForResults(args)
+ 
 
     averageLog, totalLog = createLogs()
     visualizer: Optional[Visualizer] = None
-
-    createEstimators(args, folder)
-    WORLD.initEstimators()
 
     def prepareSimulation(iteration, s):
         """Prepares the _Simulation_ (formerly known as _Run_)."""
@@ -85,18 +85,18 @@ def run(args):
     def simulationCallback(components, ensembles, t, i):
         """Collect statistics after each _Simulation_ is done."""
         totalLog.register(collectStatistics(t, i))
-        WORLD.chargerLog.export(f"{folder}/charger_logs/{yamlFileName}_{t + 1}_{i + 1}.csv")
+        WORLD.chargerLog.export(folder / f"charger_logs/{yamlFileName}_{t + 1}_{i + 1}.csv")
 
         if args.animation:
             verbosePrint(f"Saving animation...", 3)
-            visualizer.createAnimation(f"{folder}/animations/{yamlFileName}_{t + 1}_{i + 1}.gif")
+            visualizer.createAnimation(folder / f"animations/{yamlFileName}_{t + 1}_{i + 1}.gif")
             verbosePrint(f"Animation saved.", 3)
 
-        if args.chart:
+        if args.plot:
             verbosePrint(f"Saving charger plot...", 3)
             plots.createChargerPlot(
                 WORLD.chargerLogs,
-                f"{folder}\\charger_logs\\{yamlFileName}_{str(t + 1)}_{str(i + 1)}",
+                folder / f"charger_logs/{yamlFileName}_{str(t + 1)}_{str(i + 1)}.png",
                 f"World: {yamlFileName}\n Run: {i + 1} in training {t + 1}\nCharger Queues")
             verbosePrint(f"Charger plot saved.", 3)
 
@@ -110,22 +110,30 @@ def run(args):
             estimator.saveModel(t + 1)
 
     simulation = Simulation(
-        args.iterations,
-        args.simulations,
         prepareSimulation,
         iterationCallback=iterationCallback,
         simulationCallback=simulationCallback,
-        stepCallback=stepCallback )
-        
+        stepCallback=stepCallback,
+        iterations=args.iterations,
+        simulations=args.simulations,
+        configFile=args.config,
+        baseFolder=folder)
+
+    # 
+    WORLD.waitingTimeEstimator = simulation.waitingTimeEstimator
+    WORLD.batteryEstimator = simulation.batteryEstimator
+    WORLD.waitingTimeBaseline = 0
+
+    WORLD.initEstimators()
     simulation.run_experiment(ENVIRONMENT.maxSteps)
 
-    totalLog.export(f"{folder}\\{yamlFileName}.csv")
-    averageLog.export(f"{folder}\\{yamlFileName}_average.csv")
+    totalLog.export(folder / f"{yamlFileName}.csv")
+    averageLog.export(folder / f"{yamlFileName}_average.csv")
 
     plots.createLogPlot(
         totalLog.records,
         averageLog.records,
-        f"{folder}\\{yamlFileName}.png",
+        folder / f"{yamlFileName}.png",
         f"World: {yamlFileName}",
         (args.simulations, args.iterations)
     )
@@ -134,8 +142,7 @@ def run(args):
 
 def loadConfig(args):
     # load config from yaml
-    yamlFile = open(args.input, 'r')
-    yamlObject = load(yamlFile, Loader=Loader)
+    yamlObject = readYaml(args.input)
 
     yamlObject['chargerCapacity'] = findChargerCapacity(yamlObject)
     yamlObject['totalAvailableChargingEnergy'] = min(
@@ -185,43 +192,18 @@ def createLogs():
 def prepareFoldersForResults(args):
     # prepare folder structure for results
     yamlFileName = os.path.splitext(os.path.basename(args.input))[0]
-    folder = f"results\\{args.output}"
 
-    if not os.path.exists(f"{folder}\\animations"):
-        os.makedirs(f"{folder}\\animations")
-    if not os.path.exists(f"{folder}\\charger_logs"):
-        os.makedirs(f"{folder}\\charger_logs")
+    folder = Path() / 'results' / args.output
+    folder.mkdir(parents=True, exist_ok=True)
+
+    animations = Path() / folder / 'animations'
+    animations.mkdir(parents=True, exist_ok=True)
+  
+    chargerLogs = Path() / folder / 'charger_logs'
+    chargerLogs.mkdir(parents=True, exist_ok=True)
+
     return folder, yamlFileName
 
-
-def createEstimators(args, folder):
-    # create the estimators
-    commonArgs = {
-        "accumulateData": args.accumulate_data,
-        "saveCharts": args.chart,
-        "testSplit": 0.2,
-    }
-    WORLD.waitingTimeEstimator = NeuralNetworkEstimator(
-        [255, 255], # hidden layers
-        fit_params={
-            "batch_size": 256,
-        },
-        outputFolder=f"{folder}\\waiting_time",
-        name="Waiting Time",
-        **commonArgs,
-    )
-    WORLD.waitingTimeBaseline = 0
-    # if args.load != "":
-    #     waitingTimeEstimator.loadModel(args.load)
-    WORLD.batteryEstimator = NeuralNetworkEstimator(
-        [255, 255], # hidden layers
-        fit_params={
-            "batch_size": 256,
-        },
-        outputFolder=f"{folder}\\battery",
-        name="Battery",
-        **commonArgs,
-    )
 
 
 def collectStatistics(train, iteration):
@@ -238,21 +220,14 @@ def collectStatistics(train, iteration):
         iteration + 1,
     ]
 
-class TestClass:
-    def __init__ (self, a, b):
-        self.A = a
-        self.B = b
-    
 
 
 def validateArguments(args):
-
     if args.config:
         configPath = Path(args.config)
         if not configPath.exists():
             raise IOError(f"such file {args.config} does not exist")
-        simulationConfigFile = open(configPath, 'r')
-        simulationConfigObject = load(simulationConfigFile, Loader=Loader)
+        simulationConfigObject = readYaml(configPath)
         
     else:
         simulationConfigObject = {}
@@ -264,70 +239,10 @@ def validateArguments(args):
     
     # set default values
     for argument , default in zip(
-        ['output', 'verbose', 'chart', 'animation', 'seeds', 'thread'],
-        ['output', 0        , False  , False      , 42     , 4]
-    ):
+        [ 'verbose', 'seeds', 'threads'],
+        [0, 42, 4]):
         if argument not in simulationConfigObject:
             simulationConfigObject[argument] = default
-
-    def validateArgument(argument, condition, message):
-        if argument not in simulationConfigObject \
-           or not condition(simulationConfigObject[argument]):
-            raise argparse.ArgumentTypeError(message)
-        return True
-
-
-    notZeroCondition = lambda x: x >= 0
-    notNoneCondition = lambda x: x is not None
-    noneCondition = lambda x: x is None
-    intTypeCondition = lambda x: isinstance(x, int)
-    boolTypeCondition = lambda x: isinstance(x, bool)
-    stringTypeCondition = lambda x: isinstance(x, str)
-    andCondition = lambda a,b: lambda x: a(x) and b(x)
-    orCondition = lambda a,b: lambda x: a(x) or b(x)
-
-    # required arguments
-    finalCheckup = [ 
-        validateArgument(
-            x, 
-            notNoneCondition, 
-            f"{x} must be provided in the configuration file or arguments")
-        for x in ['iterations', 'simulations', 'output', 'input']
-    ]
-    # positive integers
-    finalCheckup.extend([
-        validateArgument(
-            x, 
-            orCondition(
-                noneCondition, 
-                andCondition(notZeroCondition,intTypeCondition)
-            ), 
-            f"{x} must be a positive integer number > 0.")
-        for x in ['iterations', 'simulations', 'seeds','threads']
-    ])
-    # strings
-    finalCheckup.extend([
-        validateArgument(
-            x, 
-            stringTypeCondition,
-            f"{x} must be a string")
-        for x in ['input', 'output']
-    ])
-
-    # special attribute
-    finalCheckup.append(
-        validateArgument(
-            'accumulate_data', 
-            orCondition(
-                boolTypeCondition, 
-                andCondition(notZeroCondition,intTypeCondition)
-            ),
-            'accumulate_data must be True, False or positive integer'
-            )
-    )
-
-    if not all(finalCheckup):
-        raise argparse.ArgumentTypeError('an error ocurred.')
 
     return simulationConfigObject
 
@@ -339,6 +254,7 @@ def main():
         'input', type=str, 
         help='YAML world address to be run.',
     )
+    # ML-DEECO Config file and overrides, if NONE, it loads from the --config <file.yaml> file
     parser.add_argument(
         '-c', '--config', type=str, 
         help='the configuration file', 
@@ -354,31 +270,37 @@ def main():
         help='The number of simulation runs per iteration.', 
         required=False, default=None
     )
-    parser.add_argument(
-        '-o', '--output', type=str, 
-        help='the output folder', 
-        required=False, default=None
-    )
+    # drone example arguments
     parser.add_argument(
         '-v', '--verbose', type=int, 
         help='the verboseness between 0 and 4.', 
         required=False, default=None
     )
     parser.add_argument(
-        '-a', '--animation', action='store_true', 
-        help='toggles saving the final results as a GIF animation.',
-        required=False,  default=None
-    )
-    parser.add_argument(
        '--seed', type=int, 
        help='Random seed.', 
-       required=False, default=None)
+       required=False, default=42)
 
     parser.add_argument(
         '--threads', type=int, 
         help='Number of CPU threads TF can use.', 
-        required=False, default=None)
-
+        required=False, default=4)
+    
+    parser.add_argument(
+        '-o', '--output', type=str, 
+        help='the output folder', 
+        required=False, default="output"
+    )
+    parser.add_argument(
+        '-a', '--animation', action='store_true', 
+        help='toggles saving the final results as a GIF animation.',
+        required=False,  default=False
+    )
+    parser.add_argument(
+        '-p', '--plot', action='store_true', 
+        help='toggles saving the plot results.',
+        required=False,  default=False
+    )
     args = parser.parse_args()
     config = validateArguments(args)
 
