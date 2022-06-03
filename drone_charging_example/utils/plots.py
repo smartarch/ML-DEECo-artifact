@@ -124,7 +124,7 @@ def createChargerPlot(logs, filename, title):
         axs[i].set_ylabel("Drones")
     fig.suptitle(title, fontsize=16)
     fig.tight_layout()
-    plt.savefig(filename + ".png", dpi=600)
+    plt.savefig(filename)
     # plt.show()
     plt.close(fig)
 
