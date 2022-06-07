@@ -1,6 +1,6 @@
 from typing import List, TYPE_CHECKING, Optional
 
-from ml_deeco.simulation import SIMULATION_GLOBALS
+#from ml_deeco.simulation import Simulation
 from ml_deeco.utils import Log
 from ml_deeco.estimators import NoEstimator
 
@@ -71,17 +71,16 @@ class World:
         batteryEstimator: 'Estimator'
 
     @staticmethod
-    def initEstimators():
-        # import all Components and Ensembles with Estimates
+    def initEstimators(simulation):
+        # # import all Components and Ensembles with Estimates
 
-        # noinspection PyUnresolvedReferences
+        # # noinspection PyUnresolvedReferences
         from components.drone import Drone
         # noinspection PyUnresolvedReferences
         from components.charger import Charger
         # noinspection PyUnresolvedReferences
         from ensembles.drone_charging import getEnsembles as droneChargingEnsembles
-
-        SIMULATION_GLOBALS.initEstimators()
+        simulation.initEstimators()
 
     # noinspection PyAttributeOutsideInit
     def reset(self):
