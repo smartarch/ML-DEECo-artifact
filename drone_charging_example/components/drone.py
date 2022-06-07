@@ -3,7 +3,7 @@ from typing import Optional, TYPE_CHECKING
 from components.drone_state import DroneState
 from ml_deeco.estimators import ValueEstimate, NumericFeature, CategoricalFeature, NoEstimator
 from world import ENVIRONMENT, WORLD
-from ml_deeco.simulation import MovingComponent2D, SIMULATION_GLOBALS
+from ml_deeco.simulation import MovingComponent2D  #, SIMULATION_GLOBALS
 
 if TYPE_CHECKING:
     from components.charger import Charger
@@ -112,7 +112,7 @@ class Drone(MovingComponent2D):
 
     @batteryAfterTime.extra
     def current_time(self):
-        return SIMULATION_GLOBALS.currentTimeStep
+        return WORLD.simulation.currentTimeStep
 
     @batteryAfterTime.recordValid
     def not_charging(self, inputs, targets, extra):

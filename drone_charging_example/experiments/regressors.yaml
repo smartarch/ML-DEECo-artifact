@@ -1,23 +1,17 @@
 # simulation arguments
 
 # The number of iterations (trainings) to be performed.
-iterations: 2
+iterations: 3
 
 # The number of simulation runs per iteration.
-simulations: 2
+simulations: 4
 
 
 estimators:
   waitingTimeEstimator: 
-    class: ml_deeco.estimators.NeuralNetworkEstimator
+    class: ml_deeco.estimators.LinearRegressionEstimator
     args:
-      hidden_layers: [255, 255]
-      name: "Waiting Time"
-      fit_params: 
-        batch_size: 256
       outputFolder: 'waiting_time'
-      testSplit: 0.2
-      accumulateData: True
       saveCharts: True
       
   batteryEstimator: 
