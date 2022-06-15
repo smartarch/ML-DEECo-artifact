@@ -71,7 +71,7 @@ class World:
         batteryEstimator: 'Estimator'
 
     @staticmethod
-    def initEstimators(simulation):
+    def initEstimators(experiment):
         # # import all Components and Ensembles with Estimates
 
         # # noinspection PyUnresolvedReferences
@@ -80,7 +80,7 @@ class World:
         from components.charger import Charger
         # noinspection PyUnresolvedReferences
         from ensembles.drone_charging import getEnsembles as droneChargingEnsembles
-        simulation.initEstimators()
+        experiment.initEstimators()
 
     # noinspection PyAttributeOutsideInit
     def reset(self):

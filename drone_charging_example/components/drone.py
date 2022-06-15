@@ -93,7 +93,7 @@ class Drone(MovingComponent2D):
 
     batteryAfterTime = ValueEstimate()\
         .inTimeStepsRange(1, 100, trainingPercentage=0.1)\
-        .using(WORLD.batteryEstimator)\
+        .using(WORLD.experiment.batteryEstimator)\
         .withBaseline(computeBatteryAfterTime)
 
     @batteryAfterTime.input()
@@ -112,7 +112,7 @@ class Drone(MovingComponent2D):
 
     @batteryAfterTime.extra
     def current_time(self):
-        return WORLD.simulation.currentTimeStep
+        return WORLD.experiment.currentTimeStep
 
     @batteryAfterTime.recordValid
     def not_charging(self, inputs, targets, extra):

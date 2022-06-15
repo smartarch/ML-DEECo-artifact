@@ -19,7 +19,7 @@ from utils import plots
 from utils.average_log import AverageLog
 
 from ml_deeco.estimators import ConstantEstimator, NeuralNetworkEstimator
-from ml_deeco.simulation import Simulation #, SIMULATION_GLOBALS
+from ml_deeco.simulation import Experiment #, SIMULATION_GLOBALS
 from ml_deeco.utils import setVerboseLevel, verbosePrint, Log
 
 
@@ -106,26 +106,28 @@ def run(args):
         # calculate the average rate
         averageLog.register(totalLog.average(t * args.simulations, (t + 1) * args.simulations))
 
-        for estimator in simulation.estimators:
+        for estimator in experiment.estimators:
             estimator.saveModel(t + 1)
 
-    simulation = Simulation(
+    experiment = Experiment(
         prepareSimulation,
         iterationCallback=iterationCallback,
         simulationCallback=simulationCallback,
         stepCallback=stepCallback,
         iterations=args.iterations,
         simulations=args.simulations,
+        steps=ENVIRONMENT.maxSteps,
+        baselineEstimator=0,
         configFile=args.config,
         baseFolder=folder)
 
     # 
-    WORLD.waitingTimeEstimator = simulation.waitingTimeEstimator
-    WORLD.batteryEstimator = simulation.batteryEstimator
-    WORLD.waitingTimeBaseline = 0
-    WORLD.simulation = simulation
-    WORLD.initEstimators(simulation)
-    simulation.run_experiment(ENVIRONMENT.maxSteps)
+    # WORLD.waitingTimeEstimator = experiment.waitingTimeEstimator
+    # WORLD.batteryEstimator = experiment.batteryEstimator
+    # WORLD.waitingTimeBaseline = 0
+    WORLD.experiment = experiment
+    WORLD.initEstimators(experiment)
+    experiment.run()
 
     totalLog.export(folder / f"{yamlFileName}.csv")
     averageLog.export(folder / f"{yamlFileName}_average.csv")

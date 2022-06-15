@@ -91,12 +91,12 @@ class DroneChargingAssignment(Ensemble):
         return 3
 
     def waitingTimeBaseline(self, drone):
-        return WORLD.waitingTimeBaseline
+        return WORLD.experiment.baselineEstimator
 
     # dynamic role with estimate
     drones: List[Drone] = someOf(Drone)\
         .withTimeEstimate()\
-        .using(WORLD.waitingTimeEstimator)\
+        .using(WORLD.experiment.waitingTimeEstimator)\
         .withBaseline(waitingTimeBaseline)
 
     @drones.select

@@ -79,7 +79,7 @@ class Visualizer:
     def getLegends(self):
         totalDamage = sum([field.damage for field in self.world.fields])
         totalCorp = sum([field.allCrops for field in self.world.fields])
-        text = f"Step: {self.world.simulation.currentTimeStep + 1}"
+        text = f"Step: {self.world.experiment.currentTimeStep + 1}"
         text = f"{text}\nalive drones: {len([drone for drone in self.world.drones if drone.state != DroneState.TERMINATED])} - Damage: {totalDamage}/{totalCorp}"
         text = f"{text}\nchargers: {len(self.world.chargers)} - charger capacity: {ENVIRONMENT.chargerCapacity}"
         text = f"{text}\nbirds: {len(self.world.birds)}"
