@@ -18,21 +18,13 @@ from utils.visualizers import Visualizer
 from utils import plots
 from utils.average_log import AverageLog
 
-from ml_deeco.estimators import ConstantEstimator, NeuralNetworkEstimator
-from ml_deeco.simulation import Experiment #, SIMULATION_GLOBALS
+from ml_deeco.simulation import Experiment, Configuration #, SIMULATION_GLOBALS
 from ml_deeco.utils import setVerboseLevel, verbosePrint, Log
 
 
 # instead of os, to work on every platform
 from pathlib import Path
-import yaml
 
-def readYaml (file):
-    with open(file, "r") as stream:
-        try:
-            return yaml.load(stream, Loader=yaml.CLoader)
-        except yaml.YAMLError as e:
-                raise e
                 
 def run(args):
     """
@@ -48,18 +40,17 @@ def run(args):
     tf.config.threading.set_inter_op_parallelism_threads(args.threads)
     tf.config.threading.set_intra_op_parallelism_threads(args.threads)
 
-    yamlObject = loadConfig(args)
-
-    folder, yamlFileName = prepareFoldersForResults(args)
+    # finds the local attributes in the Arguments
+    localWorld = createLocalWorld(args)
+    folder, outputFileName = prepareFoldersForResults(args)
  
-
     averageLog, totalLog = createLogs()
     visualizer: Optional[Visualizer] = None
 
     def prepareSimulation(iteration, s):
         """Prepares the _Simulation_ (formerly known as _Run_)."""
         components, ensembles = WORLD.reset()
-        if args.animation:
+        if localWorld['animation']:
             nonlocal visualizer
             visualizer = Visualizer(WORLD)
             visualizer.drawFields()
@@ -79,25 +70,25 @@ def run(args):
                 len(potential - waiting - accepted),
             ])
 
-        if args.animation:
+        if localWorld['animation']:
             visualizer.drawComponents(step + 1)
 
     def simulationCallback(components, ensembles, t, i):
         """Collect statistics after each _Simulation_ is done."""
         totalLog.register(collectStatistics(t, i))
-        WORLD.chargerLog.export(folder / f"charger_logs/{yamlFileName}_{t + 1}_{i + 1}.csv")
+        WORLD.chargerLog.export(folder / f"charger_logs/{outputFileName}_{t + 1}_{i + 1}.csv")
 
-        if args.animation:
+        if localWorld['animation']:
             verbosePrint(f"Saving animation...", 3)
-            visualizer.createAnimation(folder / f"animations/{yamlFileName}_{t + 1}_{i + 1}.gif")
+            visualizer.createAnimation(folder / f"animations/{outputFileName}_{t + 1}_{i + 1}.gif")
             verbosePrint(f"Animation saved.", 3)
 
         if args.plot:
             verbosePrint(f"Saving charger plot...", 3)
             plots.createChargerPlot(
                 WORLD.chargerLogs,
-                folder / f"charger_logs/{yamlFileName}_{str(t + 1)}_{str(i + 1)}.png",
-                f"World: {yamlFileName}\n Run: {i + 1} in training {t + 1}\nCharger Queues")
+                folder / f"charger_logs/{outputFileName}_{str(t + 1)}_{str(i + 1)}.png",
+                f"World: {outputFileName}\n Run: {i + 1} in training {t + 1}\nCharger Queues")
             verbosePrint(f"Charger plot saved.", 3)
 
     def iterationCallback(t):
@@ -114,55 +105,47 @@ def run(args):
         iterationCallback=iterationCallback,
         simulationCallback=simulationCallback,
         stepCallback=stepCallback,
-        iterations=args.iterations,
-        simulations=args.simulations,
-        steps=ENVIRONMENT.maxSteps,
-        baselineEstimator=0,
-        configFile=args.config,
-        baseFolder=folder)
+        config=args)
 
-    # 
-    # WORLD.waitingTimeEstimator = experiment.waitingTimeEstimator
-    # WORLD.batteryEstimator = experiment.batteryEstimator
-    # WORLD.waitingTimeBaseline = 0
+
     WORLD.experiment = experiment
     WORLD.initEstimators(experiment)
     experiment.run()
 
-    totalLog.export(folder / f"{yamlFileName}.csv")
-    averageLog.export(folder / f"{yamlFileName}_average.csv")
+    totalLog.export(folder / f"{outputFileName}.csv")
+    averageLog.export(folder / f"{outputFileName}_average.csv")
 
     plots.createLogPlot(
         totalLog.records,
         averageLog.records,
-        folder / f"{yamlFileName}.png",
-        f"World: {yamlFileName}",
+        folder / f"{outputFileName}.png",
+        f"World: {outputFileName}",
         (args.simulations, args.iterations)
     )
     return averageLog
 
 
-def loadConfig(args):
+def createLocalWorld(args):
     # load config from yaml
-    yamlObject = readYaml(args.input)
+    localDict = args.locals
 
-    yamlObject['chargerCapacity'] = findChargerCapacity(yamlObject)
-    yamlObject['totalAvailableChargingEnergy'] = min(
-        yamlObject['chargerCapacity'] * len(yamlObject['chargers']) * yamlObject['chargingRate'],
-        yamlObject['totalAvailableChargingEnergy'])
+    localDict['chargerCapacity'] = findChargerCapacity(localDict)
+    localDict['totalAvailableChargingEnergy'] = min(
+        localDict['chargerCapacity'] * len(localDict['chargers']) * localDict['chargingRate'],
+        localDict['totalAvailableChargingEnergy'])
 
-    ENVIRONMENT.loadConfig(yamlObject)
+    ENVIRONMENT.loadConfig(localDict)
 
-    return yamlObject
+    return localDict
 
 
-def findChargerCapacity(yamlObject):
+def findChargerCapacity(localDict):
     margin = 1.3
-    chargers = len(yamlObject['chargers'])
-    drones = yamlObject['drones']
+    chargers = len(localDict['chargers'])
+    drones = localDict['drones']
 
-    c1 = yamlObject['chargingRate']
-    c2 = yamlObject['droneMovingEnergyConsumption']
+    c1 = localDict['chargingRate']
+    c2 = localDict['droneMovingEnergyConsumption']
 
     return math.ceil(
         (margin * drones * c2) / ((chargers * c1) + (chargers * margin * c2))
@@ -193,10 +176,12 @@ def createLogs():
 
 def prepareFoldersForResults(args):
     # prepare folder structure for results
-    yamlFileName = os.path.splitext(os.path.basename(args.input))[0]
+    outputFileName = os.path.splitext(os.path.basename(args.name))[0]
 
     folder = Path() / 'results' / args.output
     folder.mkdir(parents=True, exist_ok=True)
+    # after creating the folder, we need to change it
+    args.setConfig('output',folder)
 
     animations = Path() / folder / 'animations'
     animations.mkdir(parents=True, exist_ok=True)
@@ -204,7 +189,7 @@ def prepareFoldersForResults(args):
     chargerLogs = Path() / folder / 'charger_logs'
     chargerLogs.mkdir(parents=True, exist_ok=True)
 
-    return folder, yamlFileName
+    return folder, outputFileName
 
 
 
@@ -222,29 +207,21 @@ def collectStatistics(train, iteration):
         iteration + 1,
     ]
 
-
-
 def validateArguments(args):
-    if args.config:
-        configPath = Path(args.config)
-        if not configPath.exists():
-            raise IOError(f"such file {args.config} does not exist")
-        simulationConfigObject = readYaml(configPath)
+    if args.configs:
+        simulationConfigObject = Configuration(args.configs)
         
     else:
-        simulationConfigObject = {}
+        simulationConfigObject = Configuration()
 
     # override
-    for argument in args.__dict__ :
-        if args.__dict__[argument] is not None:
-            simulationConfigObject[argument] = args.__dict__[argument]
-    
-    # set default values
-    for argument , default in zip(
-        [ 'verbose', 'seeds', 'threads'],
-        [0, 42, 4]):
-        if argument not in simulationConfigObject:
-            simulationConfigObject[argument] = default
+    for key, value in args.__dict__.items():
+        if args.__dict__[key] is not None:
+            # determine if the argument should be stored in locals or ml-deeco arguments
+            if key in simulationConfigObject.__dict__:
+                simulationConfigObject.setConfig(key,value)
+            else:
+                simulationConfigObject.locals[key] = value
 
     return simulationConfigObject
 
@@ -252,13 +229,13 @@ def main():
     parser = argparse.ArgumentParser(
         # TODO add proper description
         description='')
-    parser.add_argument(
-        'input', type=str, 
-        help='YAML world address to be run.',
-    )
+    # parser.add_argument(
+    #     'input', type=str, 
+    #     help='YAML world address to be run.',
+    # )
     # ML-DEECO Config file and overrides, if NONE, it loads from the --config <file.yaml> file
     parser.add_argument(
-        '-c', '--config', type=str, 
+        '-c', '--configs', type=str, nargs='+',
         help='the configuration file', 
         required=False, default=None
     )
@@ -291,25 +268,26 @@ def main():
     parser.add_argument(
         '-o', '--output', type=str, 
         help='the output folder', 
-        required=False, default="output"
+        required=False, default=None
+    )
+    parser.add_argument(
+        '-n', '--name', type=str, 
+        help='the name of the experiment', 
+        required=False, default=None
     )
     parser.add_argument(
         '-a', '--animation', action='store_true', 
         help='toggles saving the final results as a GIF animation.',
-        required=False,  default=False
+        required=False,  default=None
     )
     parser.add_argument(
         '-p', '--plot', action='store_true', 
         help='toggles saving the plot results.',
-        required=False,  default=False
+        required=False,  default=None
     )
     args = parser.parse_args()
-    config = validateArguments(args)
-
-    # TODO optional, to use only one dictionary we combine both into args
-    for argument in config:
-        args.__dict__[argument] = config[argument]
-
+    # from this point ARGS is a CONFIGURATION instance, not an ARGPARSE namespace
+    args = validateArguments(args)
     setVerboseLevel(args.verbose)
     run(args)
 
