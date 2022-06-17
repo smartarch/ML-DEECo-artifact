@@ -1,13 +1,10 @@
-# simulation arguments
-
-# The number of iterations (trainings) to be performed.
 iterations: 2
 
-# The number of simulation runs per iteration.
 simulations: 2
 
+verbose: 2
 
-estimators:
+estimators:  
   waitingTimeEstimator: 
     class: ml_deeco.estimators.NeuralNetworkEstimator
     args:

@@ -1,0 +1,99 @@
+# ITERATIONS
+# The number of iterations before collecting data for training.
+# Usually, simulations run in one iteration should have similar results.
+# At the end of each iteration, data is collected for training the AI models.
+# The next iteration runs simulation using the trained AI model.
+# If the iteration is 1, the model still will be trained, but will not be used for any simulation.
+# The overall complexity of the ML-DEECO is O (iterations * simulations * local_steps)
+iterations: 1
+
+# SIMULATIONS
+# The number of simulation to be run within an iteration.
+# Each simulation runs independently, but they share the estimators models within an iteration.
+simulations: 1
+
+
+# OUTPUT
+# identify the output folder for saving the results and evaluation files.
+# this is the base folder, and estimators' folders will be sub-folders.
+# for better readability, all results are saved in /results/ folder.
+output: 'output'
+
+
+# NAME
+# identify the name of the experiment.
+# The filenames will also be called this name.
+name: 'default'
+
+
+# PlOTS
+# Toggle creating and showing plots.
+plots: False
+
+
+# VERBOSE
+# identify the verboseness of the experiment runs
+# if set to 0, nothing will be logged.
+verbose: 0
+
+# SEED
+# random initializer
+seed: 42
+
+# THREADS
+# number of threads to be specified for parallelization tasks.
+thread: 4
+
+
+# ESTIMATORS
+# A user can create their own estimators and access them by the key.
+# Available estimators are
+## ml_deeco.estimators.NoEstimator
+## ml_deeco.estimators.ConstantEstimator
+## ml_deeco.estimators.LinearRegressionEstimator
+## ml_deeco.estimators.NeuralNetworkEstimator
+# user can reference to their own created estimators.
+# the args attribute calls the constrc
+# estimators:
+#   noEstimator: 
+#     class: ml_deeco.estimators.NoEstimator
+#     args:
+#       name: "No Estimator"
+#       outputFolder: 'no_estimator'
+#       saveCharts: False
+
+#   constantEstimator:
+#     class: ml_deeco.estimators.ConstantEstimator
+#     args:
+#       name: "Constant Estimator"
+#       value: 0      # constant prediction value
+#       outputFolder: 'constant_estimator'
+#       saveCharts: False
+  
+#   # This uses TensorFlow package
+#   neuralNetworkEstimator: 
+#     class: ml_deeco.estimators.NeuralNetworkEstimator
+#     args:
+#       hidden_layers: [255, 255]
+#       name: "Neural Network Estimator"
+#       fit_params: 
+#         batch_size: 256
+#       outputFolder: 'nn_estimator'
+#       testSplit: 0.2
+#       accumulateData: True
+#       saveCharts: True
+
+#   # This uses Sklearn package
+#   linearRegressorEstimator: 
+#     class: ml_deeco.estimators.LinearRegressionEstimator
+#     args:
+#       outputFolder: 'linear_estimator'
+#       saveCharts: True 
+
+# LOCALS
+# Identify attributes for the simulation configuration
+# It can be address of a configuration file, dictionary of attributes or None
+locals:
+  # internal time steps for a simulation
+  steps: 10
+  animation: False
