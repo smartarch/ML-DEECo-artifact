@@ -13,7 +13,7 @@ class Environment:
     Constants regarding the simulation environment.
     """
 
-    maxSteps = 500
+    steps = 500
     mapWidth = 100
     mapHeight = 100
 

@@ -1,0 +1,22 @@
+iterations: 3
+simulations: 7  # one for each day of the week
+
+steps: 50
+
+locals:  # configuration of the smart factory example
+  shiftStart: 30
+  shiftEnd: 50
+  workersPerShift: 100
+  standbysPerShift: 50
+  cancellationBaseline: 16
+
+  # workers arrive by a bus
+  weekDayBus: 6
+  weekEndBus: 0
+  # several workers miss the first bus and arrive by the late bus
+  latePercentage: 0.1
+  lateWeekDayBus: 12
+  lateWeekEndBus: 15
+  # standby needs about 30 minutes to arrive
+  standbyMean: 30
+  standbyStd: 2

@@ -3,24 +3,35 @@ from typing import Tuple, List
 import numpy as np
 import numpy.random as npr
 
-from ml_deeco.simulation import Point2D, SIMULATION_GLOBALS
+from ml_deeco.simulation import Point2D, Configuration as ml_deeco_Configuration
 
-from helpers import DayOfWeek
 from components import WorkPlace, Factory, Door, Dispenser, Worker
 
 
-class Configuration:
+class Configuration(ml_deeco_Configuration):
 
-    steps = 50
-    shiftStart = 30
-    shiftEnd = 50
-    workersPerShift = 100
-    standbysPerShift = 50
+    experiment = None
+
+    shiftStart: int
+    shiftEnd: int
+    workersPerShift: int
+    standbysPerShift: int
+
+    cancellationBaseline: int
+
+    # arrival configuration
+    weekDayBus: int
+    weekEndBus: int
+    latePercentage: float
+    lateWeekDayBus: int
+    lateWeekEndBus: int
+    standbyMean: int
+    standbyStd: float
+
     dayOfWeek = None
 
-    outputFolder = None
-    cancellationBaseline = 16
-    lateWorkersNN = None
+    def updateLocals(self):
+        self.__dict__.update(self.locals)
 
     def __init__(self):
         if 'CONFIGURATION' in locals():
@@ -52,33 +63,25 @@ def createFactory() -> Tuple[Factory, List[WorkPlace], Point2D]:
     return factory, [workplace1, workplace2, workplace3], busStop
 
 
-# workers arrive by a bus
-weekDayBus = 6
-weekEndBus = 0
-# several workers miss the first bus and arrive by the late bus
-latePercentage = 0.1
-lateWeekDayBus = 12
-lateWeekEndBus = 15
-# standby needs about 30 minutes to arrive
-standbyMean, standbyStd = 30, 2
-
-
 def setArrivalTime(worker: Worker, dayOfWeek):
+    from helpers import DayOfWeek
     dayOfWeek = DayOfWeek(dayOfWeek % 7)
     randomDelay = int(np.round(npr.exponential()))
 
     if dayOfWeek in (DayOfWeek.SATURDAY, DayOfWeek.SUNDAY):
-        if random.random() < latePercentage:
-            worker.busArrivalTime = lateWeekEndBus + randomDelay
+        if random.random() < CONFIGURATION.latePercentage:
+            worker.busArrivalTime = CONFIGURATION.lateWeekEndBus + randomDelay
         else:
-            worker.busArrivalTime = weekEndBus + randomDelay
+            worker.busArrivalTime = CONFIGURATION.weekEndBus + randomDelay
     else:
-        if random.random() < latePercentage:
-            worker.busArrivalTime = lateWeekDayBus + randomDelay
+        if random.random() < CONFIGURATION.latePercentage:
+            worker.busArrivalTime = CONFIGURATION.lateWeekDayBus + randomDelay
         else:
-            worker.busArrivalTime = weekDayBus + randomDelay
+            worker.busArrivalTime = CONFIGURATION.weekDayBus + randomDelay
 
 
 # we will not simulate the standby, just assume they will start working about an hour after they are called
 def setStandbyArrivedAtWorkplaceTime(standby: Worker):
-    standby.arrivedAtWorkplaceTime = SIMULATION_GLOBALS.currentTimeStep + int(random.gauss(standbyMean, standbyStd))
+    from helpers import now
+    randomDelay = int(random.gauss(CONFIGURATION.standbyMean, CONFIGURATION.standbyStd))
+    standby.arrivedAtWorkplaceTime = now() + randomDelay

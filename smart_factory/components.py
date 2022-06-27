@@ -3,7 +3,9 @@ from collections import defaultdict
 from typing import List, Set, Optional
 
 from ml_deeco.utils import verbosePrint
-from ml_deeco.simulation import StationaryComponent2D, MovingComponent2D, Component, Point2D, SIMULATION_GLOBALS
+from ml_deeco.simulation import StationaryComponent2D, MovingComponent2D, Component, Point2D
+
+from helpers import now
 
 
 class SecurityComponent(Component):
@@ -18,7 +20,7 @@ class SecurityComponent(Component):
 
     def allows(self, subject, action):
         actionAllowed = subject in self.allowed[action]
-        verbosePrint(f"{self}, {SIMULATION_GLOBALS.currentTimeStep + 1}: {'allowing' if actionAllowed else 'denying'} '{subject}' action '{action}'", 5)
+        verbosePrint(f"{self}, {now() + 1}: {'allowing' if actionAllowed else 'denying'} '{subject}' action '{action}'", 5)
         return actionAllowed
 
 
@@ -104,7 +106,7 @@ class Worker(MovingComponent2D):
     def actuate(self):
         # activate the worker if he arrived by bus
         if self.state == WorkerState.NOT_ACTIVE_YET:
-            if self.busArrivalTime is not None and SIMULATION_GLOBALS.currentTimeStep >= self.busArrivalTime:
+            if self.busArrivalTime is not None and now() >= self.busArrivalTime:
                 self.state = WorkerState.WALKING_TO_FACTORY
             return
 
@@ -121,7 +123,7 @@ class Worker(MovingComponent2D):
             if self.factory.entryDoor.allows(self, 'enter'):
                 self.state = WorkerState.WALKING_TO_DISPENSER
                 self.isAtFactory = True
-                self.arrivedAtFactoryTime = SIMULATION_GLOBALS.currentTimeStep
+                self.arrivedAtFactoryTime = now()
                 verbosePrint(f"{self}: arrived at factory", 4)
                 return
 
@@ -150,5 +152,5 @@ class Worker(MovingComponent2D):
         if self.state == WorkerState.AT_WORKPLACE_DOOR:
             if self.workplace.entryDoor.allows(self, 'enter'):
                 self.state = WorkerState.AT_WORKPLACE
-                self.arrivedAtWorkplaceTime = SIMULATION_GLOBALS.currentTimeStep
+                self.arrivedAtWorkplaceTime = now()
                 verbosePrint(f"{self}: arrived at workplace", 4)

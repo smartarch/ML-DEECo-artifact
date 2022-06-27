@@ -1,0 +1,11 @@
+estimators:
+  lateWorkers:
+    class: ml_deeco.estimators.NeuralNetworkEstimator
+    args:
+      hidden_layers: [32, 64, 32]
+      name: "Late Workers"
+      fit_params: 
+        batch_size: 4096
+      outputFolder: 'late_workers'
+
+output: "results/16"

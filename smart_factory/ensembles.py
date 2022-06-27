@@ -1,7 +1,7 @@
 from typing import List
 
 from configuration import setStandbyArrivedAtWorkplaceTime, CONFIGURATION
-from ml_deeco.estimators import NeuralNetworkEstimator, CategoricalFeature, BinaryFeature, NumericFeature
+from ml_deeco.estimators import CategoricalFeature, BinaryFeature, NumericFeature
 from ml_deeco.simulation import Ensemble, someOf
 from ml_deeco.utils import verbosePrint
 
@@ -128,7 +128,7 @@ class CancelLateWorkers(Ensemble):
     lateWorkers = someOf(Worker, selectedAllAtOnce=True)\
         .withValueEstimate(collectOnlyIfMaterialized=False)\
         .inTimeStepsRange(1, 20, trainingPercentage=0.2)\
-        .using(CONFIGURATION.lateWorkersNN)\
+        .using(CONFIGURATION.experiment.lateWorkers)\
         .withBaseline(isLateBaseline)
 
     @lateWorkers.select

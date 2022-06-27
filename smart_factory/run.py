@@ -9,11 +9,11 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by d
 # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Disable GPU in TF. The models are small, so it is actually faster to use the CPU.
 import tensorflow as tf
 
-from ml_deeco.estimators import NeuralNetworkEstimator
-from ml_deeco.simulation import Component, run_experiment, SIMULATION_GLOBALS
+from ml_deeco.simulation import Component, Experiment
 from ml_deeco.utils import setVerboseLevel, verbosePrint, Log, setVerbosePrintFile, AverageLog
+from ml_deeco.estimators import Estimator
 
-from configuration import CONFIGURATION, createFactory, setArrivalTime
+from configuration import CONFIGURATION, createFactory, setArrivalTime, Configuration
 from components import Shift, Worker
 from helpers import DayOfWeek
 from plots import plotStandbysAndLateness, plotLateWorkersNN
@@ -31,36 +31,32 @@ def computeLateness(workers):
     return float(np.mean(np.max(arrivalTimes - CONFIGURATION.shiftStart, 0) ** 2))
 
 
-def run(args):
+class FactoryExperiment(Experiment):
 
-    # Fix random seeds
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    tf.random.set_seed(args.seed)
+    lateWorkers: Estimator
 
-    # Set number of threads
-    tf.config.threading.set_inter_op_parallelism_threads(args.threads)
-    tf.config.threading.set_intra_op_parallelism_threads(args.threads)
+    def __init__(self, args):
+        super().__init__(CONFIGURATION)
+        self.args = args
 
-    # initialize output path
-    CONFIGURATION.outputFolder = Path(args.output_folder)
-    os.makedirs(CONFIGURATION.outputFolder, exist_ok=True)
-    outputFile = open(CONFIGURATION.outputFolder / "output.txt", "w")
+        # Fix random seeds
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        tf.random.set_seed(args.seed)
 
-    # initialize configuration
-    CONFIGURATION.cancellationBaseline = args.baseline
-    CONFIGURATION.lateWorkersNN = NeuralNetworkEstimator(
-        [32, 64, 32], fit_params={"batch_size": 4096},
-        name="late_workers", outputFolder=CONFIGURATION.outputFolder / "late_workers"
-    )
+        # Set number of threads
+        tf.config.threading.set_inter_op_parallelism_threads(args.threads)
+        tf.config.threading.set_intra_op_parallelism_threads(args.threads)
 
-    # initialize verbose printing
-    setVerboseLevel(args.verbose)
-    setVerbosePrintFile(outputFile)
+        # initialize output path
+        os.makedirs(CONFIGURATION.output, exist_ok=True)
+        self.outputFile = open(CONFIGURATION.output / "output.txt", "w")
 
-    from ensembles import getEnsembles, CancelLateWorkers
+        # initialize verbose printing
+        setVerboseLevel(args.verbose)
+        setVerbosePrintFile(self.outputFile)
 
-    def prepareSimulation(_i, simulation):
+    def prepareSimulation(self, _i, simulation):
         """Prepares the components and ensembles for the simul """
         global workerLogs, cancelledWorkersLog
         workerLogs = {}
@@ -83,22 +79,24 @@ def run(args):
             components += [workplace, shift, *workers, *standbys]
             shifts.append(shift)
 
-            if args.log_workers:
+            if self.args.log_workers:
                 for worker in workers + standbys:
                     workerLogs[worker] = Log(["x", "y", "state", "isAtFactory", "hasHeadGear"])
 
+        from ensembles import getEnsembles
         return components, getEnsembles(shifts)
 
-    def stepCallback(components, ensembles, step):
+    def stepCallback(self, components, ensembles, step):
+        from ensembles import CancelLateWorkers
         for cancelled in filter(lambda c: isinstance(c, CancelLateWorkers), ensembles):
             for worker in cancelled.lateWorkers:
                 cancelledWorkersLog.register([step, worker, worker.busArrivalTime, cancelled.shift])
 
-        if args.log_workers:
+        if self.args.log_workers:
             for worker in filter(lambda c: isinstance(c, Worker), components):
                 workerLogs[worker].register([int(worker.location.x), int(worker.location.x), worker.state, worker.isAtFactory, worker.hasHeadGear])
 
-    def simulationCallback(components, _ens, i, s):
+    def simulationCallback(self, components, _ens, i, s):
         workersLog = Log(["worker", "shift", "state", "isAtFactory", "hasHeadGear", "busArrivalTime", "arrivedAtFactoryTime",
                           "arrivedAtWorkplaceTime"])
 
@@ -120,48 +118,67 @@ def run(args):
             avgFactoryArrivalTime = sum(map(lambda w: w.arrivedAtFactoryTime, workersAtFactory)) / len(workersAtFactory)
             verbosePrint(f"Average arrival at factory = {avgFactoryArrivalTime:.2f}", 2)
 
-        os.makedirs(CONFIGURATION.outputFolder / f"cancelled_workers/{i + 1}/", exist_ok=True)
-        cancelledWorkersLog.export(CONFIGURATION.outputFolder / f"cancelled_workers/{i + 1}/{s + 1}.csv")
+        os.makedirs(CONFIGURATION.output / f"cancelled_workers/{i + 1}/", exist_ok=True)
+        cancelledWorkersLog.export(CONFIGURATION.output / f"cancelled_workers/{i + 1}/{s + 1}.csv")
 
-        os.makedirs(CONFIGURATION.outputFolder / f"workers/{i + 1}/", exist_ok=True)
-        workersLog.export(CONFIGURATION.outputFolder / f"workers/{i + 1}/{s + 1}.csv")
+        os.makedirs(CONFIGURATION.output / f"workers/{i + 1}/", exist_ok=True)
+        workersLog.export(CONFIGURATION.output / f"workers/{i + 1}/{s + 1}.csv")
 
-        if args.log_workers:
-            os.makedirs(CONFIGURATION.outputFolder / f"all_workers/{i+1}/{s+1}", exist_ok=True)
+        if self.args.log_workers:
+            os.makedirs(CONFIGURATION.output / f"all_workers/{i+1}/{s+1}", exist_ok=True)
             for worker in filter(lambda c: isinstance(c, Worker), components):
-                workerLogs[worker].export(CONFIGURATION.outputFolder / f"all_workers/{i+1}/{s+1}/{worker}.csv")
+                workerLogs[worker].export(CONFIGURATION.output / f"all_workers/{i+1}/{s+1}/{worker}.csv")
 
-    def iterationCallback(i):
+    def iterationCallback(self, i):
         global arrivedAtWorkplaceTimeAvgTimes
         avgTimesAverage = sum(arrivedAtWorkplaceTimeAvgTimes) / len(arrivedAtWorkplaceTimeAvgTimes)
         verbosePrint(f"Average arrival time in the iteration: {avgTimesAverage:.2f}", 1)
         arrivedAtWorkplaceTimeAvgTimes = []
 
         # save the NN
-        CONFIGURATION.lateWorkersNN.saveModel(str(i + 1))
-        plotLateWorkersNN(CONFIGURATION.lateWorkersNN, CONFIGURATION.outputFolder / f"nn_{i + 1}.png", f"Iteration {i + 1}", show=args.show_plots)
+        self.lateWorkers.saveModel(str(i + 1))
+        plotLateWorkersNN(self.lateWorkers, CONFIGURATION.output / f"nn_{i + 1}.png", f"Iteration {i + 1}", show=self.args.show_plots)
 
-    run_experiment(args.iterations, 7, CONFIGURATION.steps, prepareSimulation,
-                   stepCallback=stepCallback, simulationCallback=simulationCallback, iterationCallback=iterationCallback)
-    outputFile.close()
-    shiftsLog.export(CONFIGURATION.outputFolder / "shifts.csv")
-    shiftsLog.exportAvg(CONFIGURATION.outputFolder / "shifts_avg.csv")
-    plotStandbysAndLateness(shiftsLog, args.iterations, 7, CONFIGURATION.outputFolder / "shifts.png", show=args.show_plots)
+    def exportResults(self):
+        self.outputFile.close()
+        shiftsLog.export(CONFIGURATION.output / "shifts.csv")
+        shiftsLog.exportAvg(CONFIGURATION.output / "shifts_avg.csv")
+        plotStandbysAndLateness(shiftsLog, self.config.iterations, self.config.simulations, CONFIGURATION.output / "shifts.png", show=self.args.show_plots)
 
 
 def main():
     parser = argparse.ArgumentParser(description='Smart factory simulation')
+    parser.add_argument(
+        '-c', '--configs', type=str, nargs='+',
+        help='The configuration files',
+        required=False, default=["experiments/factory.yaml", "experiments/estimators.yaml"]
+    )
     parser.add_argument('-v', '--verbose', type=int, help='the verboseness between 0 and 4.', required=False, default="0")
     parser.add_argument('-s', '--seed', type=int, help='Random seed.', required=False, default=42)
     parser.add_argument('--threads', type=int, help='Number of CPU threads TF can use.', required=False, default=4)
-    parser.add_argument('-o', '--output_folder', type=str, help='Output folder for the logs.', required=True, default='results')
+    parser.add_argument('-o', '--output', type=str, help='Output folder for the logs.')
     parser.add_argument('-w', '--log_workers', action='store_true', help='Save logs of all workers.', required=False, default=False)
-    parser.add_argument('-b', '--baseline', type=int, help="Cancel missing workers 'baseline' minutes before the shift starts.", required=False, default=16)
-    parser.add_argument('-i', '--iterations', type=int, help="Number of iterations to run.", required=False, default=3)
+    parser.add_argument('-b', '--baseline', type=int, help="Cancel missing workers 'baseline' minutes before the shift starts.", required=False)
+    parser.add_argument('-i', '--iterations', type=int, help="Number of iterations to run.", required=False)
     parser.add_argument('-p', '--show_plots', action='store_true', help='Show plots during the run.', required=False, default=False)
     args = parser.parse_args()
 
-    run(args)
+    for file in args.configs:
+        CONFIGURATION.loadConfigurationFromFile(file)
+    CONFIGURATION.updateLocals()
+
+    if args.baseline:
+        CONFIGURATION.cancellationBaseline = args.baseline
+    if args.iterations:
+        CONFIGURATION.iterations = args.iterations
+    if args.output:
+        CONFIGURATION.output = args.output
+    CONFIGURATION.output = Path(CONFIGURATION.output)
+
+    experiment = FactoryExperiment(args)
+    CONFIGURATION.experiment = experiment
+    import ensembles  # import to initialize Estimates
+    experiment.run()
 
 
 if __name__ == "__main__":

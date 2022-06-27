@@ -1,11 +1,13 @@
 import enum
+from typing import TYPE_CHECKING
 
-from ml_deeco.simulation import SIMULATION_GLOBALS
 from ml_deeco.utils import verbosePrint
-from components import SecurityComponent
+
+if TYPE_CHECKING:
+    from components import SecurityComponent
 
 
-def allow(subjects, action, object: SecurityComponent):
+def allow(subjects, action, object: 'SecurityComponent'):
     subjects = list(subjects)
     for s in subjects:
         object.allow(s, action)
@@ -14,7 +16,8 @@ def allow(subjects, action, object: SecurityComponent):
 
 
 def now():
-    return SIMULATION_GLOBALS.currentTimeStep
+    from configuration import CONFIGURATION
+    return CONFIGURATION.experiment.currentTimeStep
 
 
 class DayOfWeek(enum.IntEnum):
