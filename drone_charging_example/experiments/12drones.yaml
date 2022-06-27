@@ -1,9 +1,10 @@
 name: world-12drones
 
-output: test-12drones
+output: results/test-12drones
+
+maxSteps: 200
 
 locals:
-  maxSteps: 200
   animation: False
   drones: 12
   birds: 100

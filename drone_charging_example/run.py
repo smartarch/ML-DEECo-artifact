@@ -7,6 +7,7 @@ import argparse
 import random
 import numpy as np
 import math
+from pathlib import Path
 
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Disable GPU in TF. The models are small, so it is actually faster to use the CPU.
@@ -18,14 +19,126 @@ from utils.visualizers import Visualizer
 from utils import plots
 from utils.average_log import AverageLog
 
-from ml_deeco.simulation import Experiment, Configuration #, SIMULATION_GLOBALS
+from ml_deeco.simulation import Experiment, Configuration
 from ml_deeco.utils import setVerboseLevel, verbosePrint, Log
 
 
-# instead of os, to work on every platform
-from pathlib import Path
+class DronesExperiment(Experiment):
 
-                
+    def __init__(self, config):
+
+        self.folder, self.outputFileName = prepareFoldersForResults(config)
+
+        super().__init__(config)
+
+        # finds the local attributes in the Arguments
+        self.localWorld = createLocalWorld(config)
+        self.animation = self.localWorld["animation"]
+
+        self.averageLog, self.totalLog = self.createLogs()
+        self.visualizer: Optional[Visualizer] = None
+
+    def prepareSimulation(self, iteration, s):
+        """Prepares the _Simulation_ (formerly known as _Run_)."""
+        components, ensembles = WORLD.reset()
+        if self.animation:
+            self.visualizer = Visualizer(WORLD)
+            self.visualizer.drawFields()
+        return components, ensembles
+
+    def stepCallback(self, components, materializedEnsembles, step):
+        """Collect statistics after one _Step_ of the _Simulation_."""
+        for charger, log in zip(WORLD.chargers, WORLD.chargerLogs):
+            accepted = set(charger.acceptedDrones)
+            waiting = set(charger.waitingDrones)
+            potential = set(charger.potentialDrones)
+            log.register([
+                len(charger.chargingDrones),
+                len(accepted),
+                len(waiting - accepted),
+                len(potential - waiting - accepted),
+            ])
+
+        if self.animation:
+            self.visualizer.drawComponents(step + 1)
+
+    def simulationCallback(self, components, ensembles, t, i):
+        """Collect statistics after each _Simulation_ is done."""
+        self.totalLog.register(self.collectStatistics(t, i))
+        WORLD.chargerLog.export(self.folder / f"charger_logs/{self.outputFileName}_{t + 1}_{i + 1}.csv")
+
+        if self.animation:
+            verbosePrint(f"Saving animation...", 3)
+            self.visualizer.createAnimation(self.folder / f"animations/{self.outputFileName}_{t + 1}_{i + 1}.gif")
+            verbosePrint(f"Animation saved.", 3)
+
+        if self.config.plot:
+            verbosePrint(f"Saving charger plot...", 3)
+            plots.createChargerPlot(
+                WORLD.chargerLogs,
+                self.folder / f"charger_logs/{self.outputFileName}_{str(t + 1)}_{str(i + 1)}.png",
+                f"World: {self.outputFileName}\n Run: {i + 1} in training {t + 1}\nCharger Queues")
+            verbosePrint(f"Charger plot saved.", 3)
+
+    @staticmethod
+    def collectStatistics(train, iteration):
+        MAXDRONES = ENVIRONMENT.droneCount if ENVIRONMENT.droneCount > 0 else 1
+        MAXDAMAGE = sum([field.allCrops for field in WORLD.fields])
+
+        return [
+            len([drone for drone in WORLD.drones if drone.state != DroneState.TERMINATED]),
+            sum([field.damage for field in WORLD.fields]),
+            len([drone for drone in WORLD.drones if drone.state != DroneState.TERMINATED]) / MAXDRONES,  # rate
+            sum([field.damage for field in WORLD.fields]) / MAXDAMAGE,  # rage
+            ENVIRONMENT.chargerCapacity,
+            train + 1,
+            iteration + 1,
+        ]
+
+    def iterationCallback(self, t):
+        """Aggregate statistics from all _Simulations_ in one _Iteration_."""
+
+        # calculate the average rate
+        self.averageLog.register(self.totalLog.average(t * self.config.simulations, (t + 1) * self.config.simulations))
+
+        for estimator in self.estimators:
+            estimator.saveModel(t + 1)
+
+    @staticmethod
+    def createLogs():
+        totalLog = AverageLog([
+            'Active Drones',
+            'Total Damage',
+            'Alive Drone Rate',
+            'Damage Rate',
+            'Charger Capacity',
+            'Train',
+            'Run',
+        ])
+        averageLog = AverageLog([
+            'Active Drones',
+            'Total Damage',
+            'Alive Drone Rate',
+            'Damage Rate',
+            'Charger Capacity',
+            'Train',
+            'Average Run',
+        ])
+        return averageLog, totalLog
+
+    def exportResults(self):
+        self.totalLog.export(self.folder / f"{self.outputFileName}.csv")
+        self.averageLog.export(self.folder / f"{self.outputFileName}_average.csv")
+
+        plots.createLogPlot(
+            self.totalLog.records,
+            self.averageLog.records,
+            self.folder / f"{self.outputFileName}.png",
+            f"World: {self.outputFileName}",
+            (self.config.simulations, self.config.iterations)
+        )
+
+
 def run(args):
     """
     Runs `args.iterations` times _iteration_ of [`args.simulations` times _simulation_ + 1 training].
@@ -40,89 +153,12 @@ def run(args):
     tf.config.threading.set_inter_op_parallelism_threads(args.threads)
     tf.config.threading.set_intra_op_parallelism_threads(args.threads)
 
-    # finds the local attributes in the Arguments
-    localWorld = createLocalWorld(args)
-    folder, outputFileName = prepareFoldersForResults(args)
- 
-    averageLog, totalLog = createLogs()
-    visualizer: Optional[Visualizer] = None
-
-    def prepareSimulation(iteration, s):
-        """Prepares the _Simulation_ (formerly known as _Run_)."""
-        components, ensembles = WORLD.reset()
-        if localWorld['animation']:
-            nonlocal visualizer
-            visualizer = Visualizer(WORLD)
-            visualizer.drawFields()
-        return components, ensembles
-
-    def stepCallback(components, materializedEnsembles, step):
-        """Collect statistics after one _Step_ of the _Simulation_."""
-        for chargerIndex in range(len(WORLD.chargers)):
-            charger = WORLD.chargers[chargerIndex]
-            accepted = set(charger.acceptedDrones)
-            waiting = set(charger.waitingDrones)
-            potential = set(charger.potentialDrones)
-            WORLD.chargerLogs[chargerIndex].register([
-                len(charger.chargingDrones),
-                len(accepted),
-                len(waiting - accepted),
-                len(potential - waiting - accepted),
-            ])
-
-        if localWorld['animation']:
-            visualizer.drawComponents(step + 1)
-
-    def simulationCallback(components, ensembles, t, i):
-        """Collect statistics after each _Simulation_ is done."""
-        totalLog.register(collectStatistics(t, i))
-        WORLD.chargerLog.export(folder / f"charger_logs/{outputFileName}_{t + 1}_{i + 1}.csv")
-
-        if localWorld['animation']:
-            verbosePrint(f"Saving animation...", 3)
-            visualizer.createAnimation(folder / f"animations/{outputFileName}_{t + 1}_{i + 1}.gif")
-            verbosePrint(f"Animation saved.", 3)
-
-        if args.plot:
-            verbosePrint(f"Saving charger plot...", 3)
-            plots.createChargerPlot(
-                WORLD.chargerLogs,
-                folder / f"charger_logs/{outputFileName}_{str(t + 1)}_{str(i + 1)}.png",
-                f"World: {outputFileName}\n Run: {i + 1} in training {t + 1}\nCharger Queues")
-            verbosePrint(f"Charger plot saved.", 3)
-
-    def iterationCallback(t):
-        """Aggregate statistics from all _Simulations_ in one _Iteration_."""
-
-        # calculate the average rate
-        averageLog.register(totalLog.average(t * args.simulations, (t + 1) * args.simulations))
-
-        for estimator in experiment.estimators:
-            estimator.saveModel(t + 1)
-
-    experiment = Experiment(
-        prepareSimulation,
-        iterationCallback=iterationCallback,
-        simulationCallback=simulationCallback,
-        stepCallback=stepCallback,
-        config=args)
-
+    experiment = DronesExperiment(config=args)
 
     WORLD.experiment = experiment
     WORLD.initEstimators(experiment)
     experiment.run()
-
-    totalLog.export(folder / f"{outputFileName}.csv")
-    averageLog.export(folder / f"{outputFileName}_average.csv")
-
-    plots.createLogPlot(
-        totalLog.records,
-        averageLog.records,
-        folder / f"{outputFileName}.png",
-        f"World: {outputFileName}",
-        (args.simulations, args.iterations)
-    )
-    return averageLog
+    experiment.exportResults()
 
 
 def createLocalWorld(args):
@@ -152,65 +188,28 @@ def findChargerCapacity(localDict):
     )
 
 
-def createLogs():
-    totalLog = AverageLog([
-        'Active Drones',
-        'Total Damage',
-        'Alive Drone Rate',
-        'Damage Rate',
-        'Charger Capacity',
-        'Train',
-        'Run',
-    ])
-    averageLog = AverageLog([
-        'Active Drones',
-        'Total Damage',
-        'Alive Drone Rate',
-        'Damage Rate',
-        'Charger Capacity',
-        'Train',
-        'Average Run',
-    ])
-    return averageLog, totalLog
-
-
 def prepareFoldersForResults(args):
     # prepare folder structure for results
     outputFileName = os.path.splitext(os.path.basename(args.name))[0]
 
-    folder = Path() / 'results' / args.output
+    folder = Path() / args.output
     folder.mkdir(parents=True, exist_ok=True)
     # after creating the folder, we need to change it
-    args.setConfig('output',folder)
+    args.setConfig('output', folder)
 
     animations = Path() / folder / 'animations'
     animations.mkdir(parents=True, exist_ok=True)
-  
+
     chargerLogs = Path() / folder / 'charger_logs'
     chargerLogs.mkdir(parents=True, exist_ok=True)
 
     return folder, outputFileName
 
 
-
-def collectStatistics(train, iteration):
-    MAXDRONES = ENVIRONMENT.droneCount if ENVIRONMENT.droneCount > 0 else 1
-    MAXDAMAGE = sum([field.allCrops for field in WORLD.fields])
-
-    return [
-        len([drone for drone in WORLD.drones if drone.state != DroneState.TERMINATED]),
-        sum([field.damage for field in WORLD.fields]),
-        len([drone for drone in WORLD.drones if drone.state != DroneState.TERMINATED]) / MAXDRONES,  # rate
-        sum([field.damage for field in WORLD.fields]) / MAXDAMAGE,  # rage
-        ENVIRONMENT.chargerCapacity,
-        train + 1,
-        iteration + 1,
-    ]
-
 def validateArguments(args):
     if args.configs:
         simulationConfigObject = Configuration(args.configs)
-        
+
     else:
         simulationConfigObject = Configuration()
 
@@ -219,11 +218,12 @@ def validateArguments(args):
         if args.__dict__[key] is not None:
             # determine if the argument should be stored in locals or ml-deeco arguments
             if key in simulationConfigObject.__dict__:
-                simulationConfigObject.setConfig(key,value)
+                simulationConfigObject.setConfig(key, value)
             else:
                 simulationConfigObject.locals[key] = value
 
     return simulationConfigObject
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -236,54 +236,54 @@ def main():
     # ML-DEECO Config file and overrides, if NONE, it loads from the --config <file.yaml> file
     parser.add_argument(
         '-c', '--configs', type=str, nargs='+',
-        help='the configuration file', 
+        help='the configuration file',
         required=False, default=None
     )
     parser.add_argument(
-        '-i', '--iterations', type=int, 
-        help='The number of iterations (trainings) to be performed.', 
-        required=False,  default=None
+        '-i', '--iterations', type=int,
+        help='The number of iterations (trainings) to be performed.',
+        required=False, default=None
     )
     parser.add_argument(
-        '-s', '--simulations', type=int, 
-        help='The number of simulation runs per iteration.', 
+        '-s', '--simulations', type=int,
+        help='The number of simulation runs per iteration.',
         required=False, default=None
     )
     # drone example arguments
     parser.add_argument(
-        '-v', '--verbose', type=int, 
-        help='the verboseness between 0 and 4.', 
+        '-v', '--verbose', type=int,
+        help='the verboseness between 0 and 4.',
         required=False, default=None
     )
     parser.add_argument(
-       '--seed', type=int, 
-       help='Random seed.', 
-       required=False, default=42)
+        '--seed', type=int,
+        help='Random seed.',
+        required=False, default=42)
 
     parser.add_argument(
-        '--threads', type=int, 
-        help='Number of CPU threads TF can use.', 
+        '--threads', type=int,
+        help='Number of CPU threads TF can use.',
         required=False, default=4)
-    
+
     parser.add_argument(
-        '-o', '--output', type=str, 
-        help='the output folder', 
+        '-o', '--output', type=str,
+        help='the output folder',
         required=False, default=None
     )
     parser.add_argument(
-        '-n', '--name', type=str, 
-        help='the name of the experiment', 
+        '-n', '--name', type=str,
+        help='the name of the experiment',
         required=False, default=None
     )
     parser.add_argument(
-        '-a', '--animation', action='store_true', 
+        '-a', '--animation', action='store_true',
         help='toggles saving the final results as a GIF animation.',
-        required=False,  default=None
+        required=False, default=None
     )
     parser.add_argument(
-        '-p', '--plot', action='store_true', 
+        '-p', '--plot', action='store_true',
         help='toggles saving the plot results.',
-        required=False,  default=None
+        required=False, default=None
     )
     args = parser.parse_args()
     # from this point ARGS is a CONFIGURATION instance, not an ARGPARSE namespace
