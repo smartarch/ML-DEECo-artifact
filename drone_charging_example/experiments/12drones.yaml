@@ -1,8 +1,7 @@
 name: world-12drones
-
 output: results/test-12drones
 
-maxSteps: 200
+steps: 200
 
 locals:
   animation: False

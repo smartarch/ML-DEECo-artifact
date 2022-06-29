@@ -8,4 +8,7 @@ estimators:
         batch_size: 4096
       outputFolder: 'late_workers'
 
+locals:
+  cancellationBaseline: 22
+
 output: "results/16"

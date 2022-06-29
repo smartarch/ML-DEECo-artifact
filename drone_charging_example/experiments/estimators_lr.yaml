@@ -1,5 +1,5 @@
-name: 12drones-nn
-output: results/test-12drones-nn
+name: 12drones-lr
+output: results/test-12drones-lr
 
 iterations: 2
 simulations: 2
@@ -19,12 +19,9 @@ estimators:
       saveCharts: True
       
   batteryEstimator: 
-    class: ml_deeco.estimators.NeuralNetworkEstimator
+    class: ml_deeco.estimators.LinearRegressionEstimator
     args:
-      hidden_layers: [64]
       name: "Battery"
-      fit_params: 
-        batch_size: 128
       outputFolder: 'battery'
       accumulateData: True
       saveCharts: False

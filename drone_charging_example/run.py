@@ -227,17 +227,11 @@ def validateArguments(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        # TODO add proper description
-        description='')
-    # parser.add_argument(
-    #     'input', type=str, 
-    #     help='YAML world address to be run.',
-    # )
-    # ML-DEECO Config file and overrides, if NONE, it loads from the --config <file.yaml> file
+        description='Smart farming experiment with drones protecting fields against birds.')
     parser.add_argument(
         '-c', '--configs', type=str, nargs='+',
         help='the configuration file',
-        required=False, default=None
+        required=True, default=None
     )
     parser.add_argument(
         '-i', '--iterations', type=int,
