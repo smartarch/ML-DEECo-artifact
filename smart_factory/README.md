@@ -10,7 +10,7 @@ In this document, a simple guide to run the example is presented:
 
 ## Installation
 
-The example requires Python 3 with `numpy`, `tensorflow`, `matplotlib` and `seaborn` libraries installed.
+The example requires Python 3 with `pyyaml`, `numpy`, `tensorflow`, `matplotlib` and `seaborn` libraries installed.
 
 Furthermore, `ml_deeco` shall be installed to run the simulation:
 

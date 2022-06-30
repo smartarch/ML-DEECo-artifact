@@ -9,7 +9,9 @@ from components import WorkPlace, Factory, Door, Dispenser, Worker
 
 
 class Configuration(ml_deeco_Configuration):
+    """Holds the configuration of the experiment."""
 
+    # reference to the experiment instance which is useful for setting the estimator inside CancelLateWorkers ensemble
     experiment = None
 
     shiftStart: int
@@ -42,6 +44,8 @@ CONFIGURATION = Configuration()
 
 
 def createFactory() -> Tuple[Factory, List[WorkPlace], Point2D]:
+    """Creates an example factory with work places and a bus stop (at which the workers arrive)."""
+
     factory = Factory()
     factory.entryDoor = Door(20, 90)
     factory.dispenser = Dispenser(30, 90)
@@ -64,6 +68,8 @@ def createFactory() -> Tuple[Factory, List[WorkPlace], Point2D]:
 
 
 def setArrivalTime(worker: Worker, dayOfWeek):
+    """Sets a random arrival time for the worker (based on the configured mean and standard deviation)."""
+
     from helpers import DayOfWeek
     dayOfWeek = DayOfWeek(dayOfWeek % 7)
     randomDelay = int(np.round(npr.exponential()))
@@ -80,8 +86,8 @@ def setArrivalTime(worker: Worker, dayOfWeek):
             worker.busArrivalTime = CONFIGURATION.weekDayBus + randomDelay
 
 
-# we will not simulate the standby, just assume they will start working about an hour after they are called
 def setStandbyArrivedAtWorkplaceTime(standby: Worker):
+    """We will not simulate the standby, just assume they will start working about an hour after they are called."""
     from helpers import now
     randomDelay = int(random.gauss(CONFIGURATION.standbyMean, CONFIGURATION.standbyStd))
     standby.arrivedAtWorkplaceTime = now() + randomDelay

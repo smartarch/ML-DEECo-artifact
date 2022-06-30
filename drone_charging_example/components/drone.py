@@ -1,9 +1,9 @@
 import random
 from typing import Optional, TYPE_CHECKING
 from components.drone_state import DroneState
-from ml_deeco.estimators import ValueEstimate, NumericFeature, CategoricalFeature, NoEstimator
+from ml_deeco.estimators import ValueEstimate
 from world import ENVIRONMENT, WORLD
-from ml_deeco.simulation import MovingComponent2D  #, SIMULATION_GLOBALS
+from ml_deeco.simulation import MovingComponent2D
 
 if TYPE_CHECKING:
     from components.charger import Charger

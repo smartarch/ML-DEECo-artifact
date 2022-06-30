@@ -8,46 +8,19 @@ In this broad example, we provide a simulation that runs a system which protects
 - [Simulation &ndash; Components and Ensembles](#simulation-ndash-components-and-ensembles)
 
 ## Installation
-To run the example, some libraries must be installed. The installation requires `Python 3` and `pip`. If you have `pip` installed skip to - [Package Installation](#package-installation).
 
-To install `pip` follow the following instructions:
+The example requires Python 3 with `pyyaml`, `numpy`, `matplotlib`, `seaborn`, `tensorflow` and `sklearn` libraries installed.
 
-### Install pip on Debian/Ubuntu
-```
-apt install python3-pip
-```
-### Install pip on CentOS, RHEL, Fedora
-```
-yum -y update
-yum install python-pip
-```
-### Install pip on Arch Linux
-```
-pacman -S python-pip
-```
-### Install pip on openSUSE
-```
-zypper install python3-pip
-```
-### Install pip on Windows
-First download https://bootstrap.pypa.io/get-pip.py and copy/save it in a folder. Then run the following command:
-```
-python <path-to-get-pip.py>/get-pip.py
-```
-### Package Installation
-All the required packages and libraries are stored in [requirements.txt](requirements.txt).
-> :warning: the requirements include **Tensorflow**, and the size of its dependencies could reach **1.5 GB**
+Furthermore, `ml_deeco` shall be installed to run the simulation:
 
-#### Step 1: install all the packages by running the following command:
 ```
-pip install -r requirements.txt
-```
-#### Step 2: install ML-DEECo using `pip` (the `--editable` switch can be omitted if one does not plan to change the code of ML-DEECo):
-```
-pip install --editable ../ml_deeco
+pip install ../ml_deeco
 ```
 
 ## Usage
+
+*TODO*: update with new YAML files and arguments 
+
 The simulation is configured with a YAML file. A few examples can be found in [experiments](experiments). The results will be stored in `results` folder. For a quick run, simply execute the following command:
 
 ```
@@ -188,14 +161,15 @@ The simulation runs a number of stateful and stateless component that perform in
 
 ### Field
 The field class instances represent the agricultural fields on the map. Each field has a number of crops to be protected. The fields are divided into places (based on the protection radius of drones). To simplify the simulation, the fields are presented as rectangles,: `[x1, y1, x2, y2]`
-~~~text
+
+```text
     (x1,y1) .__________
             |          |
             |__________|.(x2,y2). 
-~~~
+```
 
 ### Drone
-The drones protect the fields from birds by moving to the field and scaring the flocks of birds away. In programming perspective, drone components have access to shared `WORLD` and they can find the position to protect. In a real-life scenario, it is assumed that additional sensors will perform the detection of birds, and it can be read from them. The drones have the following states:
+The drones protect the fields from birds by moving to the field and scaring the flocks of birds away. In programming perspective, drone components have access to shared `WORLD` and they can find the position to protect. In a real-life scenario, it is assumed that additional sensors will perform the detection of birds (this can be realized in the `Field` component), and it can be read from them. The drones have the following states:
 
 #### Drone State
 * **IDLE**: default initial state of a drone.
