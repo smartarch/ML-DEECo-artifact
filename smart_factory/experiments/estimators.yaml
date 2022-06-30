@@ -1,3 +1,5 @@
+iterations: 3
+
 estimators:
   lateWorkers:
     class: ml_deeco.estimators.NeuralNetworkEstimator
@@ -9,6 +11,6 @@ estimators:
       outputFolder: 'late_workers'
 
 locals:
-  cancellationBaseline: 22
+  cancellationBaseline: 16
 
 output: "results/16"

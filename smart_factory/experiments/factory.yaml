@@ -1,6 +1,4 @@
-iterations: 3
 simulations: 7  # one for each day of the week
-
 steps: 50
 
 locals:  # configuration of the smart factory example
