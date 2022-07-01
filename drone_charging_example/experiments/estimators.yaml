@@ -1,12 +1,12 @@
-name: 12drones-nn
-output: results/12drones-nn
+name: 12drones-nn            # identification of the experiment configuration
+output: results/12drones-nn  # folder with the results
 
-iterations: 3
-simulations: 2
+iterations: 3   # each iteration consist of running the simulation (to collect data) and training of the ML model
+simulations: 2  # number of simulation runs in each iteration
 
 verbose: 2
 
-estimators:  
+estimators:
   waitingTimeEstimator: 
     class: ml_deeco.estimators.NeuralNetworkEstimator
     args:
