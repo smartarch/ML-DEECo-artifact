@@ -1,7 +1,7 @@
 name: 12drones-lr
-output: results/test-12drones-lr
+output: results/12drones-lr
 
-iterations: 2
+iterations: 3
 simulations: 2
 
 verbose: 2

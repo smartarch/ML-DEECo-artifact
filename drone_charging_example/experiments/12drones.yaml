@@ -1,30 +1,30 @@
-name: world-12drones
-output: results/test-12drones
+name: 12drones
+output: results/12drones
 
 steps: 200
 
 locals:
   animation: False
-  drones: 12
-  birds: 100
-  chargers: [
+  drones: 12    # the number of drones
+  birds: 100    # the number of birds
+  chargers: [   # locations of chargers (2D coordinates)
     [17,29],
     [22,21],
     [28,13],
   ]
-  fields: [
+  fields: [     # locations of chargers (2D coordinates)
     [3,4,21,18],
     [35,7,48,36],
     [4,33,26,47],
   ]
   mapWidth: 50
   mapHeight: 50
-  droneRadius: 5
+  droneRadius: 5  # protecting radius of the drone -- birds inside this radius will flee away
   birdSpeed: 1 
   droneSpeed: 1
-  chargingRate: 0.04
-  totalAvailableChargingEnergy: 0.1
-  droneMovingEnergyConsumption: 0.01
-  droneProtectingEnergyConsumption: 0.005
-  droneBatteryRandomize: 0
-  droneStartPositionVariance: 0
+  chargingRate: 0.04  # battery charged in one step
+  totalAvailableChargingEnergy: 0.1  # total available charging rate for all chargers (if too many drones are charged at the same time, the total energy output of all chargers is limited)
+  droneMovingEnergyConsumption: 0.01       # battery consumption when drone is moving
+  droneProtectingEnergyConsumption: 0.005  # battery consumption when drone is hovering
+  droneBatteryRandomize: 0        # sets the amount of randomization of the battery of the drones at the beginning of the simulation
+  droneStartPositionVariance: 0   # sets the amount of randomization of the position of the drones at the beginning of the simulation
