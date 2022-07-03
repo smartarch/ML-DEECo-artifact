@@ -179,6 +179,7 @@ def main():
     CONFIGURATION.experiment = experiment
     import ensembles  # import to initialize Estimates
     experiment.run()
+    experiment.exportResults()
 
 
 if __name__ == "__main__":

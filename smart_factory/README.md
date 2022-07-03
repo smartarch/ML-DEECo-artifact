@@ -29,7 +29,11 @@ py run.py -v 2 -p
 * `-v 2` sets a reasonable the verbosity level
 * `-p` enables displaying the plots with results
 
-The rest of the parameters of the simulation are defined in the configuration YAML files: [`factory.yaml`](experiments/factory.yaml) (configures the start time of shifts, arrival times of workers, etc.), [`estimators.yaml`](experiments/estimators.yaml) (definition of the ML model and folder for the results). 
+The rest of the parameters of the simulation are defined in the configuration YAML files: [`factory.yaml`](experiments/factory.yaml) (configures the start time of shifts, arrival times of workers, etc.), [`estimators.yaml`](experiments/estimators.yaml) (definition of the ML model and folder for the results).
+
+The command above produces the following chart. We can see that the number of necessary standbys and lateness (the sum of squares of delay of late workers) decreases as we use an adapted rule for replacing late workers.
+
+![standbys and lateness](results/shifts.png)
 
 ## Simulation overview
 

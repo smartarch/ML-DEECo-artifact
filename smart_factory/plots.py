@@ -30,7 +30,7 @@ def computeWeeklyAverages(data, iterations, simulations):
 
 def plotStandbysAndLateness(shiftsLog, iterations, simulations, filename=None, show=False, figsize=None):
     if not figsize:
-        figsize = (10, 10)
+        figsize = (9, 5)
     fig, ax_s = plt.subplots(figsize=figsize)
 
     xLabels = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"][:simulations] * iterations
@@ -110,7 +110,7 @@ def plotLateWorkersNN(estimator, filename=None, subtitle="", show=False, figsize
     xTickLabels = [str(x) if x % 3 == 0 else "" for x in range(CONFIGURATION.shiftStart, -1, -1)]
 
     if not figsize:
-        figsize = (10, 10)
+        figsize = (9, 5)
     fig, ax = plt.subplots(figsize=figsize)
 
     cmap = generateColormap()
