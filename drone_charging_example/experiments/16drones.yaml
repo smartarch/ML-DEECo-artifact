@@ -1,7 +1,7 @@
 name: 16drones
 output: results/16drones
 
-steps: 200
+steps: 500
 
 locals:
   animation: False
