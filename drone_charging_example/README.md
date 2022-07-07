@@ -52,7 +52,7 @@ An example of the configuration can be found in the [experiments/12drones.yaml](
 
 The `name` and `output` define the name of the experiment and the output folder. However, in the examples above, these values are overridden by the configuration of the estimators.
 
-The simulation is set to run for 200 `steps`.
+The simulation is set to run for 500 `steps`.
 
 In the `locals` dictionary, the configuration of the farm is defined. We set the number of `drones`, `birds`, size of the map, locations of `chargers` and `fields`, etc. The `animation` switch toggles producing GIF files with animations of the whole simulation run (note that producing the animations takes significant amount of time and storage).
 
