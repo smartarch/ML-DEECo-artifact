@@ -1,4 +1,3 @@
 [submodule "ml_deeco"]
 	path = ml_deeco
 	url = https://github.com/smartarch/ML-DEECo.git
-	branch = artifact
