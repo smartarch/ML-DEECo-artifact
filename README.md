@@ -10,7 +10,22 @@ This repository features implementation of the **ML-DEECo** framework as well as
 
 ### Prerequisites
 
-The ML-DEECo itself requires Python 3.6+ and the following packages installable via `pip`: `numpy`, `seaborn`, `matplotlib`, and `pyyaml`. The typical expected application is to include the ML-DEECo repository as a submodule of your simulation repository (as we did in this artifact).
+The ML-DEECo itself requires Python 3.6+ and the following packages installable by
 
-The artifacts may require additional packages based on which ML library they are using.
+```
+pip install numpy seaborn matplotlib pyyaml
+```
 
+The typical expected application is to include the ML-DEECo repository as a submodule of your simulation repository (as we did in this artifact).
+
+The artifacts may require additional packages based on which ML library they are using (detailed in their readme files).
+
+
+### Documentation
+
+The documentation is scattered in several readme files:
+
+* [ML-DEECo readme](https://github.com/smartarch/ML-DEECo/blob/master/README.md) &ndash; describes the installation and usage of the framework itself. Also explains the components and ensembles as well as overall architecture.
+* [ML-DEECo simple-example readme](https://github.com/smartarch/ML-DEECo/blob/master/examples/simple_example/README.md) &ndash; explains the simple example which can be used as a bootstrap code to quickly sketch your own simulation
+* [Drone charging example readme](drone_charging_example) &ndash; contains the installation and usage guidelines for the smart farming example, expected results, configuration details, and component model overview
+* [Factory workers example readme](smart_factory) &ndash; contains the installation and usage guidelines for the factory access control example, expected results, and simulation architecture overview
